@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memória Mágica — Jogo da Memória Infantil</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎴</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #FDF6EC;
+    --ink: #4A342A;
+    --ink-soft: #7A6255;
+    --card: #FFFFFF;
+    --accent: #FF7043;
+    --accent-dark: #E05A30;
+    --gold: #FFC53D;
+    --radius: 20px;
+    --shadow: 0 4px 0 rgba(74, 52, 42, 0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body { height: 100%; }
+
+  body {
+    font-family: "Fredoka", "Baloo 2", system-ui, sans-serif;
+    background-color: var(--bg);
+    background-image: radial-gradient(#EBDCC7 1.5px, transparent 1.5px);
+    background-size: 26px 26px;
+    color: var(--ink);
+    min-height: 100vh;
+  }
+
+  button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+
+  button:focus-visible {
+    outline: 3px solid #2B6CB0;
+    outline-offset: 3px;
+    border-radius: 12px;
+  }
+
+  .screen { display: none; min-height: 100vh; }
+  .screen.active { display: flex; flex-direction: column; align-items: center; }
+
+  .container { width: 100%; max-width: 640px; padding: 24px 20px 40px; }
+
+  /* ---------- Cabeçalho ---------- */
+  .topbar {
+    width: 100%; max-width: 640px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; padding: 16px 20px 0;
+  }
+
+  .icon-btn {
+    width: 48px; height: 48px; flex: 0 0 48px;
+    display: grid; place-items: center;
+    background: var(--card); border-radius: 14px;
+    box-shadow: var(--shadow);
+    color: var(--ink);
+    transition: transform 0.15s ease-out, background 0.15s ease-out;
+  }
+  .icon-btn:hover { background: #FFF3E8; }
+  .icon-btn:active { transform: translateY(2px); }
+  .icon-btn svg { width: 24px; height: 24px; }
+
+  /* ---------- Home / Temas ---------- */
+  .hero { text-align: center; margin: 28px 0 24px; }
+  .hero h1 {
+    font-size: clamp(34px, 8vw, 48px);
+    font-weight: 700;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  .hero h1 .magic { color: var(--accent); }
+  .hero p {
+    margin-top: 8px;
+    font-size: 18px; font-weight: 500; color: var(--ink-soft);
+  }
+
+  .themes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  @media (min-width: 540px) { .themes { grid-template-columns: repeat(3, 1fr); } }
+
+  .theme-card {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    padding: 20px 12px 18px;
+    background: var(--card);
+    border: 2px solid var(--tint, #EEE);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+  }
+  .theme-card:hover { transform: translateY(-3px); }
+  .theme-card:active { transform: translateY(0); }
+  .theme-card .bubble {
+    width: 72px; height: 72px; border-radius: 50%;
+    display: grid; place-items: center;
+    font-size: 40px; line-height: 1;
+    background: var(--tint);
+  }
+  .theme-card .tname { font-size: 17px; font-weight: 600; color: var(--ink); text-align: center; }
+
+  .footnote { margin-top: 28px; text-align: center; color: var(--ink-soft); font-size: 14px; font-weight: 500; }
+
+  /* ---------- Níveis ---------- */
+  .level-head { text-align: center; margin: 16px 0 24px; }
+  .level-head h2 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+  .level-head p { margin-top: 6px; font-size: 16px; font-weight: 500; color: var(--ink-soft); }
+
+  .levels { display: flex; flex-direction: column; gap: 16px; max-width: 440px; margin: 0 auto; width: 100%; }
+
+  .level-btn {
+    display: flex; align-items: center; gap: 16px;
+    padding: 18px 20px;
+    background: var(--card);
+    border: 2px solid #EFE3D2;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    text-align: left;
+    transition: transform 0.15s ease-out, border-color 0.15s ease-out;
+  }
+  .level-btn:hover { transform: translateY(-2px); border-color: var(--c, var(--accent)); }
+  .level-btn:active { transform: translateY(0); }
+  .level-btn .badge {
+    width: 56px; height: 56px; flex: 0 0 56px;
+    border-radius: 16px; display: grid; place-items: center;
+    color: #fff; font-weight: 700; font-size: 15px;
+    background: var(--c, var(--accent));
+  }
+  .level-btn .lv-name { font-size: 20px; font-weight: 600; }
+  .level-btn .lv-desc { font-size: 14px; font-weight: 500; color: var(--ink-soft); margin-top: 2px; }
+
+  /* ---------- Jogo ---------- */
+  .game-info {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    margin: 4px 0 16px;
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 16px;
+    background: var(--card); border-radius: 999px;
+    box-shadow: var(--shadow);
+    font-size: 16px; font-weight: 600; color: var(--ink);
+  }
+  .chip svg { width: 18px; height: 18px; color: var(--accent); }
+
+  .grid {
+    display: grid; gap: 12px;
+    width: 100%; margin: 0 auto;
+  }
+  .grid-facil   { grid-template-columns: repeat(3, 1fr); max-width: 420px; }
+  .grid-medio   { grid-template-columns: repeat(4, 1fr); max-width: 520px; }
+  .grid-dificil { grid-template-columns: repeat(4, 1fr); max-width: 560px; }
+  @media (max-width: 480px) {
+    .grid-medio { grid-template-columns: repeat(3, 1fr); }
+  }
+
+  .card {
+    perspective: 800px;
+    aspect-ratio: 3 / 4;
+    min-height: 44px;
+  }
+  .card-inner {
+    position: relative; width: 100%; height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.25s ease-out;
+  }
+  .card.flipped .card-inner, .card.matched .card-inner { transform: rotateY(180deg); }
+
+  .card-back, .card-face {
+    position: absolute; inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 14px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px;
+  }
+  .card-back {
+    background: var(--theme-color);
+    border: 3px solid rgba(255, 255, 255, 0.55);
+    box-shadow: var(--shadow);
+  }
+  .card-back svg { width: 38%; height: 38%; opacity: 0.85; color: rgba(255,255,255,0.9); }
+
+  .card-face {
+    transform: rotateY(180deg);
+    background: var(--card);
+    border: 2px solid #EFE3D2;
+    box-shadow: var(--shadow);
+    padding: 4px;
+  }
+  .card.matched .card-face {
+    border-color: var(--theme-color);
+    background: var(--theme-tint);
+  }
+  .card-face .pic { font-size: clamp(30px, 9vw, 52px); line-height: 1.1; }
+  .card-face .word {
+    font-size: clamp(10px, 2.6vw, 14px);
+    font-weight: 600; color: var(--ink);
+    text-align: center; line-height: 1.15;
+  }
+
+  @keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+    100% { transform: scale(1); }
+  }
+  .card.matched { animation: pop 0.35s ease-out; }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+  .card.wrong { animation: shake 0.3s ease-out; }
+
+  /* ---------- Vitória ---------- */
+  .overlay {
+    position: fixed; inset: 0;
+    background: rgba(74, 52, 42, 0.45);
+    display: none; align-items: center; justify-content: center;
+    padding: 20px; z-index: 50;
+  }
+  .overlay.show { display: flex; }
+  .win-card {
+    background: var(--card);
+    border-radius: 24px;
+    padding: 32px 28px 28px;
+    text-align: center;
+    max-width: 380px; width: 100%;
+    box-shadow: 0 8px 0 rgba(74, 52, 42, 0.18);
+    animation: rise 0.35s ease-out;
+  }
+  @keyframes rise {
+    from { transform: translateY(24px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .win-card h2 { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; }
+  .win-card .stars { display: flex; justify-content: center; gap: 8px; margin: 16px 0 8px; }
+  .win-card .stars svg { width: 44px; height: 44px; color: #E7DAC8; }
+  .win-card .stars svg.lit { color: var(--gold); animation: pop 0.4s ease-out backwards; }
+  .win-card .stars svg.lit:nth-child(2) { animation-delay: 0.15s; }
+  .win-card .stars svg.lit:nth-child(3) { animation-delay: 0.3s; }
+  .win-card .stars svg { animation-fill-mode: backwards; }
+  .win-card p { color: var(--ink-soft); font-weight: 500; margin-bottom: 20px; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 14px 24px;
+    border-radius: 16px;
+    font-size: 17px; font-weight: 600;
+    color: #fff;
+    background: var(--accent);
+    box-shadow: 0 4px 0 var(--accent-dark);
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+  }
+  .btn:hover { transform: translateY(-1px); }
+  .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 var(--accent-dark); }
+  .btn.ghost {
+    background: var(--card); color: var(--ink);
+    border: 2px solid #EFE3D2;
+    box-shadow: 0 4px 0 rgba(74, 52, 42, 0.1);
+  }
+  .win-actions { display: flex; flex-direction: column; gap: 10px; }
+  .win-actions .btn { width: 100%; }
+
+  #confetti {
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 60;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- ======== TELA: TEMAS ======== -->
+<section id="screen-home" class="screen active">
+  <div class="topbar" style="justify-content: flex-end;">
+    <button class="icon-btn" id="sound-btn" aria-label="Ativar ou desativar sons" aria-pressed="true"></button>
+  </div>
+  <div class="container">
+    <div class="hero">
+      <h1>Memória <span class="magic">Mágica</span></h1>
+      <p>Escolha um tema para jogar!</p>
+    </div>
+    <div class="themes" id="themes"></div>
+    <p class="footnote">Feito para crianças de 4 a 7 anos</p>
+  </div>
+</section>
+
+<!-- ======== TELA: NÍVEIS ======== -->
+<section id="screen-level" class="screen">
+  <div class="topbar">
+    <button class="icon-btn" id="back-home" aria-label="Voltar para os temas"></button>
+    <button class="icon-btn" id="sound-btn-2" aria-label="Ativar ou desativar sons" aria-pressed="true"></button>
+  </div>
+  <div class="container">
+    <div class="level-head">
+      <h2 id="level-title">Tema</h2>
+      <p>Escolha a dificuldade:</p>
+    </div>
+    <div class="levels" id="levels"></div>
+  </div>
+</section>
+
+<!-- ======== TELA: JOGO ======== -->
+<section id="screen-game" class="screen">
+  <div class="topbar">
+    <button class="icon-btn" id="back-level" aria-label="Voltar para os níveis"></button>
+    <button class="icon-btn" id="restart" aria-label="Embaralhar de novo"></button>
+    <button class="icon-btn" id="sound-btn-3" aria-label="Ativar ou desativar sons" aria-pressed="true"></button>
+  </div>
+  <div class="container">
+    <div class="game-info">
+      <span class="chip" id="chip-theme"></span>
+      <span class="chip" id="chip-moves"></span>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+</section>
+
+<!-- ======== OVERLAY: VITÓRIA ======== -->
+<div class="overlay" id="win-overlay">
+  <div class="win-card" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <h2 id="win-title">Parabéns!</h2>
+    <div class="stars" id="win-stars"></div>
+    <p id="win-msg">Você encontrou todos os pares!</p>
+    <div class="win-actions">
+      <button class="btn" id="play-again">Jogar de novo</button>
+      <button class="btn ghost" id="change-theme">Trocar tema</button>
+    </div>
+  </div>
+</div>
+
+<canvas id="confetti"></canvas>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ================= Dados ================= */
+
+  var THEMES = [
+    {
+      id: "floresta", name: "Animais da Floresta", preview: "\u{1F98A}",
+      color: "#43A047", tint: "#E8F5E9",
+      items: [
+        { e: "🦊", w: "Raposa" }, { e: "🐻", w: "Urso" }, { e: "🦉", w: "Coruja" },
+        { e: "🐰", w: "Coelho" }, { e: "🐿️", w: "Esquilo" }, { e: "🦌", w: "Cervo" },
+        { e: "🦔", w: "Ouriço" }, { e: "🐺", w: "Lobo" }
+      ]
+    },
+    {
+      id: "dinos", name: "Mundo dos Dinos", preview: "\u{1F996}",
+      color: "#FF7043", tint: "#FFF3E0",
+      items: [
+        { e: "\u{1F995}", w: "Dino" }, { e: "\u{1F996}", w: "T-Rex" }, { e: "\u{1F98E}", w: "Lagarto" },
+        { e: "🐊", w: "Jacaré" }, { e: "🐢", w: "Tartaruga" }, { e: "🥚", w: "Ovo" },
+        { e: "🌋", w: "Vulcão" }, { e: "🌴", w: "Palmeira" }
+      ]
+    },
+    {
+      id: "mar", name: "Fundo do Mar", preview: "🐠",
+      color: "#29B6F6", tint: "#E1F5FE",
+      items: [
+        { e: "🐠", w: "Peixe" }, { e: "🐡", w: "Peixe-balão" }, { e: "🦈", w: "Tubarão" },
+        { e: "🐙", w: "Polvo" }, { e: "🦀", w: "Caranguejo" }, { e: "🐬", w: "Golfinho" },
+        { e: "🐳", w: "Baleia" }, { e: "🐚", w: "Concha" }
+      ]
+    },
+    {
+      id: "escola", name: "Objetos Escolares", preview: "🎒",
+      color: "#AB47BC", tint: "#F3E5F5",
+      items: [
+        { e: "✏️", w: "Lápis" }, { e: "📚", w: "Livros" }, { e: "🎒", w: "Mochila" },
+        { e: "✂️", w: "Tesoura" }, { e: "🎨", w: "Tintas" }, { e: "📏", w: "Régua" },
+        { e: "📝", w: "Caderno" }, { e: "🔭", w: "Telescópio" }
+      ]
+    },
+    {
+      id: "frutas", name: "Frutas", preview: "🍓",
+      color: "#EF5350", tint: "#FFEBEE",
+      items: [
+        { e: "🍍", w: "Abacaxi" }, { e: "🍉", w: "Melancia" }, { e: "🥭", w: "Manga" },
+        { e: "🍇", w: "Uva" }, { e: "🍓", w: "Morango" }, { e: "🍎", w: "Maçã" },
+        { e: "🍌", w: "Banana" }, { e: "🍊", w: "Laranja" }
+      ]
+    }
+  ];
+
+  var LEVELS = [
+    { id: "facil",   name: "Fácil",   pairs: 3, desc: "6 cartões — para os pequenos",  color: "#43A047" },
+    { id: "medio",   name: "Médio",   pairs: 6, desc: "12 cartões — equilibrado",      color: "#FFA000" },
+    { id: "dificil", name: "Difícil", pairs: 8, desc: "16 cartões — para campeões",    color: "#E05A30" }
+  ];
+
+  var STAR_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>';
+  var STAR_OUTLINE_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>';
+  var VOLUME_ON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/></svg>';
+  var VOLUME_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></svg>';
+  var CHEVRON_LEFT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>';
+  var RESTART_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>';
+
+  var REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ================= Estado ================= */
+
+  var state = {
+    theme: null,
+    level: null,
+    deck: [],
+    first: null,
+    lock: false,
+    moves: 0,
+    matches: 0,
+    mistakes: 0,
+    muted: false
+  };
+
+  var $ = function (sel) { return document.querySelector(sel); };
+
+  /* ================= Sons (Web Audio) ================= */
+
+  var audioCtx = null;
+
+  function getCtx() {
+    if (state.muted) return null;
+    if (!audioCtx) {
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      audioCtx = new AC();
+    }
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    return audioCtx;
+  }
+
+  function tone(freq, start, dur, type, vol) {
+    var ctx = getCtx();
+    if (!ctx) return;
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = type || "sine";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.0001, ctx.currentTime + start);
+    gain.gain.exponentialRampToValueAtTime(vol || 0.18, ctx.currentTime + start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + dur);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(ctx.currentTime + start);
+    osc.stop(ctx.currentTime + start + dur + 0.05);
+  }
+
+  var sfx = {
+    click: function () { tone(520, 0, 0.08, "sine", 0.1); },
+    flip: function () { tone(400, 0, 0.09, "triangle", 0.12); tone(600, 0.05, 0.09, "triangle", 0.1); },
+    match: function () { tone(523, 0, 0.14, "sine", 0.16); tone(659, 0.1, 0.14, "sine", 0.16); tone(784, 0.2, 0.25, "sine", 0.16); },
+    mismatch: function () { tone(300, 0, 0.15, "sine", 0.1); tone(240, 0.14, 0.2, "sine", 0.1); },
+    win: function () {
+      [523, 659, 784, 1047].forEach(function (f, i) { tone(f, i * 0.13, 0.3, "sine", 0.16); });
+      tone(1319, 0.55, 0.5, "sine", 0.12);
+    }
+  };
+
+  function speak(word) {
+    if (state.muted) return;
+    if (!("speechSynthesis" in window)) return;
+    try {
+      window.speechSynthesis.cancel();
+      var utt = new SpeechSynthesisUtterance(word);
+      utt.lang = "pt-BR";
+      utt.rate = 0.9;
+      utt.pitch = 1.1;
+      window.speechSynthesis.speak(utt);
+    } catch (e) { /* sem voz disponível */ }
+  }
+
+  /* ================= Confete ================= */
+
+  function confetti() {
+    if (REDUCED_MOTION) return;
+    var canvas = $("#confetti");
+    var ctx2 = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    var colors = [state.theme.color, state.theme.tint, "#FFC53D", "#FF7043", "#43A047", "#29B6F6"];
+    var parts = [];
+    for (var i = 0; i < 120; i++) {
+      parts.push({
+        x: Math.random() * canvas.width,
+        y: -20 - Math.random() * canvas.height * 0.4,
+        w: 6 + Math.random() * 6,
+        h: 8 + Math.random() * 8,
+        vy: 2 + Math.random() * 3,
+        vx: -1.5 + Math.random() * 3,
+        rot: Math.random() * Math.PI,
+        vr: -0.1 + Math.random() * 0.2,
+        color: colors[Math.floor(Math.random() * colors.length)]
+      });
+    }
+    var start = performance.now();
+    function frame(now) {
+      ctx2.clearRect(0, 0, canvas.width, canvas.height);
+      parts.forEach(function (p) {
+        p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+        ctx2.save();
+        ctx2.translate(p.x, p.y);
+        ctx2.rotate(p.rot);
+        ctx2.fillStyle = p.color;
+        ctx2.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx2.restore();
+      });
+      if (now - start < 2800) requestAnimationFrame(frame);
+      else ctx2.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  /* ================= Navegação de telas ================= */
+
+  function showScreen(id) {
+    document.querySelectorAll(".screen").forEach(function (s) { s.classList.remove("active"); });
+    $("#" + id).classList.add("active");
+  }
+
+  /* ================= Tela: temas ================= */
+
+  function renderThemes() {
+    var wrap = $("#themes");
+    wrap.innerHTML = "";
+    THEMES.forEach(function (t) {
+      var btn = document.createElement("button");
+      btn.className = "theme-card";
+      btn.style.setProperty("--tint", t.tint);
+      btn.setAttribute("aria-label", "Tema " + t.name);
+      btn.innerHTML = '<span class="bubble" aria-hidden="true">' + t.preview + '</span><span class="tname">' + t.name + "</span>";
+      btn.addEventListener("click", function () {
+        sfx.click();
+        state.theme = t;
+        openLevels();
+      });
+      wrap.appendChild(btn);
+    });
+  }
+
+  /* ================= Tela: níveis ================= */
+
+  function openLevels() {
+    $("#level-title").textContent = state.theme.name;
+    var wrap = $("#levels");
+    wrap.innerHTML = "";
+    LEVELS.forEach(function (lv) {
+      var btn = document.createElement("button");
+      btn.className = "level-btn";
+      btn.style.setProperty("--c", lv.color);
+      btn.setAttribute("aria-label", "Nível " + lv.name + ", " + lv.desc);
+      btn.innerHTML =
+        '<span class="badge" aria-hidden="true">' + lv.pairs + " pares</span>" +
+        '<span><span class="lv-name">' + lv.name + '</span><div class="lv-desc">' + lv.desc + "</div></span>";
+      btn.addEventListener("click", function () {
+        sfx.click();
+        state.level = lv;
+        startGame();
+      });
+      wrap.appendChild(btn);
+    });
+    showScreen("screen-level");
+  }
+
+  /* ================= Jogo ================= */
+
+  function shuffle(arr) {
+    for (var i = arr.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+    }
+    return arr;
+  }
+
+  function startGame() {
+    var chosen = shuffle(state.theme.items.slice()).slice(0, state.level.pairs);
+    state.deck = shuffle(chosen.concat(chosen.map(function (it) { return { e: it.e, w: it.w }; })));
+    state.first = null;
+    state.lock = false;
+    state.moves = 0;
+    state.matches = 0;
+    state.mistakes = 0;
+
+    var grid = $("#grid");
+    grid.className = "grid grid-" + state.level.id;
+    grid.style.setProperty("--theme-color", state.theme.color);
+    grid.style.setProperty("--theme-tint", state.theme.tint);
+    grid.innerHTML = "";
+
+    state.deck.forEach(function (item, idx) {
+      var card = document.createElement("button");
+      card.className = "card";
+      card.dataset.item = item.e;
+      card.setAttribute("aria-label", "Carta virada");
+      card.innerHTML =
+        '<div class="card-inner">' +
+          '<div class="card-back">' + STAR_OUTLINE_SVG + "</div>" +
+          '<div class="card-face"><span class="pic" aria-hidden="true">' + item.e + '</span><span class="word">' + item.w + "</span></div>" +
+        "</div>";
+      card.addEventListener("click", function () { onCardClick(card, item); });
+      grid.appendChild(card);
+    });
+
+    $("#chip-theme").textContent = state.theme.preview + " " + state.theme.name;
+    updateMoves();
+    showScreen("screen-game");
+  }
+
+  function updateMoves() {
+    $("#chip-moves").textContent = "Jogadas: " + state.moves;
+  }
+
+  function onCardClick(card, item) {
+    if (state.lock) return;
+    if (card.classList.contains("flipped") || card.classList.contains("matched")) return;
+
+    sfx.flip();
+    card.classList.add("flipped");
+    card.setAttribute("aria-label", item.w);
+
+    if (!state.first) {
+      state.first = { card: card, item: item };
+      return;
+    }
+
+    state.moves++;
+    updateMoves();
+
+    if (state.first.item.e === item.e) {
+      var a = state.first;
+      state.first = null;
+      state.matches++;
+      a.card.classList.remove("flipped");
+      a.card.classList.add("matched");
+      card.classList.remove("flipped");
+      card.classList.add("matched");
+      a.card.setAttribute("aria-label", item.w + ", encontrada");
+      card.setAttribute("aria-label", item.w + ", encontrada");
+      sfx.match();
+      speak(item.w);
+      if (state.matches === state.level.pairs) setTimeout(win, 600);
+    } else {
+      state.mistakes++;
+      state.lock = true;
+      var firstCopy = state.first;
+      state.first = null;
+      setTimeout(function () {
+        firstCopy.card.classList.add("wrong");
+        card.classList.add("wrong");
+        sfx.mismatch();
+        setTimeout(function () {
+          firstCopy.card.classList.remove("flipped", "wrong");
+          card.classList.remove("flipped", "wrong");
+          firstCopy.card.setAttribute("aria-label", "Carta virada");
+          card.setAttribute("aria-label", "Carta virada");
+          state.lock = false;
+        }, 350);
+      }, 450);
+    }
+  }
+
+  /* ================= Vitória ================= */
+
+  function win() {
+    sfx.win();
+    confetti();
+
+    var stars = 1;
+    if (state.mistakes <= state.level.pairs) stars = 3;
+    else if (state.mistakes <= state.level.pairs * 2) stars = 2;
+
+    var msgs = ["Você encontrou todos os pares!", "Que memória incrível!", "Você é demais!", "Muito bem, campeão!"];
+    $("#win-title").textContent = ["Parabéns!", "Muito bem!", "Incrível!", "Você conseguiu!"][Math.floor(Math.random() * 4)];
+    $("#win-msg").textContent = msgs[Math.floor(Math.random() * msgs.length)];
+    $("#win-msg").textContent += " Você fez " + state.moves + " jogadas.";
+
+    var wrap = $("#win-stars");
+    wrap.innerHTML = STAR_SVG + STAR_SVG + STAR_SVG;
+    wrap.querySelectorAll("svg").forEach(function (svg, i) {
+      if (i < stars) svg.classList.add("lit");
+    });
+
+    $("#win-overlay").classList.add("show");
+    if (!state.muted) speak($("#win-title").textContent);
+  }
+
+  /* ================= Sons: botões ================= */
+
+  function setMuted(m) {
+    state.muted = m;
+    if (m && "speechSynthesis" in window) window.speechSynthesis.cancel();
+    ["#sound-btn", "#sound-btn-2", "#sound-btn-3"].forEach(function (sel) {
+      var b = $(sel);
+      b.innerHTML = m ? VOLUME_OFF : VOLUME_ON;
+      b.setAttribute("aria-pressed", String(!m));
+      b.setAttribute("aria-label", m ? "Ativar sons" : "Desativar sons");
+    });
+  }
+
+  /* ================= Inicialização ================= */
+
+  function init() {
+    $("#back-home").innerHTML = CHEVRON_LEFT;
+    $("#back-level").innerHTML = CHEVRON_LEFT;
+    $("#restart").innerHTML = RESTART_SVG;
+    setMuted(false);
+
+    $("#sound-btn").addEventListener("click", function () { setMuted(!state.muted); if (!state.muted) sfx.click(); });
+    $("#sound-btn-2").addEventListener("click", function () { setMuted(!state.muted); if (!state.muted) sfx.click(); });
+    $("#sound-btn-3").addEventListener("click", function () { setMuted(!state.muted); if (!state.muted) sfx.click(); });
+
+    $("#back-home").addEventListener("click", function () { sfx.click(); showScreen("screen-home"); });
+    $("#back-level").addEventListener("click", function () { sfx.click(); openLevels(); });
+    $("#restart").addEventListener("click", function () { sfx.click(); startGame(); });
+
+    $("#play-again").addEventListener("click", function () {
+      $("#win-overlay").classList.remove("show");
+      sfx.click();
+      startGame();
+    });
+    $("#change-theme").addEventListener("click", function () {
+      $("#win-overlay").classList.remove("show");
+      sfx.click();
+      showScreen("screen-home");
+    });
+
+    renderThemes();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
