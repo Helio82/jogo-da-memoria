@@ -73,6 +73,26 @@
 
   .topbar-end { justify-content: flex-end; }
 
+  .btn-logged { color: var(--accent); }
+
+  .login-input {
+    width: 100%;
+    padding: 14px 16px;
+    font: inherit;
+    font-size: 18px;
+    border: 2px solid #EFE3D2;
+    border-radius: 14px;
+    margin: 4px 0 14px;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  .login-form { display: flex; flex-direction: column; text-align: left; margin: 16px 0 8px; }
+  .login-form label { font-weight: 600; font-size: 14px; color: var(--ink); }
+  .login-status { min-height: 22px; font-weight: 500; font-size: 15px; color: #B03A2E; margin: 10px 0; }
+  .login-status.ok { color: #2E7D32; }
+  .login-actions { display: flex; flex-direction: column; gap: 10px; }
+  .login-actions .btn { width: 100%; }
+
   .sr-only {
     position: absolute; width: 1px; height: 1px;
     padding: 0; margin: -1px; overflow: hidden;
@@ -299,6 +319,7 @@
 <!-- ======== TELA: TEMAS ======== -->
 <section id="screen-home" class="screen active">
   <div class="topbar topbar-end">
+    <button class="icon-btn" id="login-btn" aria-label="Entrar com e-mail"></button>
     <button class="icon-btn sound-toggle" aria-label="Desativar sons" aria-pressed="true"></button>
   </div>
   <div class="container">
@@ -352,6 +373,33 @@
     <div class="win-actions">
       <button class="btn" id="play-again">Jogar de novo</button>
       <button class="btn ghost" id="change-theme">Trocar tema</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== OVERLAY: LOGIN ======== -->
+<div class="overlay" id="login-overlay">
+  <div class="win-card" id="login-card" role="dialog" aria-modal="true" aria-labelledby="login-title">
+    <h2 id="login-title">Entrar</h2>
+    <p id="login-sub">Enviaremos um código por e-mail</p>
+
+    <form class="login-form" id="login-form">
+      <label for="login-email">E-mail</label>
+      <input class="login-input" type="email" id="login-email" autocomplete="email" required>
+      <button class="btn" type="submit">Enviar código</button>
+    </form>
+
+    <form class="login-form" id="code-form" hidden>
+      <label for="login-code">Código de 6 dígitos</label>
+      <input class="login-input" type="text" id="login-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" required>
+      <button class="btn" type="submit">Confirmar código</button>
+    </form>
+
+    <p class="login-status" id="login-status" role="status"></p>
+
+    <div class="login-actions">
+      <button class="btn ghost" id="login-close">Fechar</button>
+      <button class="btn ghost" id="login-logout" hidden>Sair da conta</button>
     </div>
   </div>
 </div>
@@ -424,6 +472,7 @@
   var VOLUME_OFF = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><line x1="22" x2="16" y1="9" y2="15"/><line x1="16" x2="22" y1="9" y2="15"/></svg>';
   var CHEVRON_LEFT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>';
   var RESTART_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>';
+  var USER_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
 
   var WIN_DELAY = 600;
   var MISMATCH_SHOW_DELAY = 450;
@@ -769,6 +818,57 @@
     });
   }
 
+  /* ================= Login (Resend) ================= */
+
+  var loginToken = null;
+
+  function postJSON(url, obj) {
+    return fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(obj)
+    }).then(function (r) {
+      return r.json().then(function (d) { return { ok: r.ok, data: d }; });
+    });
+  }
+
+  function setLoginState(email) {
+    state.user = email;
+    var btn = $("#login-btn");
+    btn.classList.toggle("btn-logged", !!email);
+    btn.setAttribute("aria-label", email ? "Conta conectada: " + email + ". Clique para gerenciar." : "Entrar com e-mail");
+    if (email) {
+      $("#login-sub").textContent = "Conectado!";
+      $("#login-form").hidden = true;
+      $("#code-form").hidden = true;
+      $("#login-logout").hidden = false;
+      var status = $("#login-status");
+      status.textContent = "Conectado como " + email;
+      status.classList.add("ok");
+    }
+  }
+
+  function openLogin() {
+    var overlay = $("#login-overlay");
+    if (state.user) {
+      setLoginState(state.user);
+    } else {
+      $("#login-sub").textContent = "Enviaremos um código por e-mail";
+      $("#login-form").hidden = false;
+      $("#code-form").hidden = true;
+      $("#login-logout").hidden = true;
+      $("#login-status").textContent = "";
+      $("#login-status").classList.remove("ok");
+    }
+    overlay.classList.add("show");
+    $("#login-email").focus();
+  }
+
+  function closeLogin() {
+    $("#login-overlay").classList.remove("show");
+    $("#login-btn").focus();
+  }
+
   /* ================= Inicialização ================= */
 
   function init() {
@@ -812,6 +912,78 @@
         focusables[0].focus();
       }
     });
+
+    $("#login-btn").innerHTML = USER_SVG;
+    $("#login-btn").addEventListener("click", function () { sfx.click(); openLogin(); });
+    $("#login-close").addEventListener("click", function () { sfx.click(); closeLogin(); });
+    $("#login-card").addEventListener("keydown", function (e) {
+      if (e.key === "Escape") closeLogin();
+    });
+
+    $("#login-form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var email = $("#login-email").value.trim();
+      var status = $("#login-status");
+      status.textContent = "Enviando código...";
+      status.classList.remove("ok");
+      postJSON("/api/login", { email: email }).then(function (r) {
+        if (!r.ok) {
+          status.textContent = r.data.error || "Não foi possível enviar. Tente de novo.";
+          return;
+        }
+        loginToken = r.data.token;
+        $("#login-form").hidden = true;
+        $("#code-form").hidden = false;
+        status.textContent = "Código enviado! Confira o e-mail " + email + ".";
+        status.classList.add("ok");
+        $("#login-code").focus();
+      }).catch(function () {
+        status.textContent = "Sem conexão com a internet. O login precisa estar on-line.";
+      });
+    });
+
+    $("#code-form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var status = $("#login-status");
+      status.textContent = "Confirmando...";
+      status.classList.remove("ok");
+      postJSON("/api/verify", {
+        email: $("#login-email").value.trim(),
+        code: $("#login-code").value.trim(),
+        token: loginToken
+      }).then(function (r) {
+        if (!r.ok) {
+          status.textContent = r.data.error || "Não foi possível confirmar. Tente de novo.";
+          return;
+        }
+        setLoginState(r.data.email);
+        sfx.match();
+        setStatus("Bem-vindo, " + r.data.email + "!");
+        setTimeout(closeLogin, 900);
+      }).catch(function () {
+        status.textContent = "Sem conexão com a internet. O login precisa estar on-line.";
+      });
+    });
+
+    $("#login-logout").addEventListener("click", function () {
+      fetch("/api/logout", { method: "POST" }).then(function () {
+        state.user = null;
+        loginToken = null;
+        $("#login-btn").classList.remove("btn-logged");
+        $("#login-btn").setAttribute("aria-label", "Entrar com e-mail");
+        $("#login-sub").textContent = "Enviaremos um código por e-mail";
+        $("#login-form").hidden = false;
+        $("#code-form").hidden = true;
+        $("#login-logout").hidden = true;
+        var status = $("#login-status");
+        status.textContent = "Você saiu da conta.";
+        status.classList.remove("ok");
+      });
+    });
+
+    fetch("/api/me").then(function (r) { return r.json(); }).then(function (d) {
+      if (d.email) setLoginState(d.email);
+    }).catch(function () { /* offline: segue sem login */ });
 
     renderThemes();
 
