@@ -165,6 +165,22 @@
   .level-btn .lv-name { font-size: 20px; font-weight: 600; }
   .level-btn .lv-desc { display: block; font-size: 14px; font-weight: 500; color: var(--ink-soft); margin-top: 2px; }
 
+  .mode-toggle {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    background: #F1E6D6; padding: 6px; border-radius: 16px;
+    margin-bottom: 20px;
+  }
+  .mode-btn {
+    padding: 12px 10px; border-radius: 12px;
+    font-size: 16px; font-weight: 600; color: var(--ink-soft);
+    transition: background 0.15s ease-out, color 0.15s ease-out;
+  }
+  .mode-btn.active { background: var(--card); color: var(--ink); box-shadow: var(--shadow); }
+
+  .player-chip { display: inline-flex; align-items: center; gap: 6px; border: 2px solid transparent; transition: border-color 0.15s ease-out; }
+  .player-chip.active { border-color: var(--accent); color: var(--accent-dark); }
+  .theme-stars { font-size: 13px; font-weight: 600; color: #B8860B; }
+
   /* ---------- Jogo ---------- */
   .game-info {
     display: flex; align-items: center; justify-content: center; gap: 12px;
@@ -343,6 +359,10 @@
       <h2 id="level-title">Tema</h2>
       <p>Escolha a dificuldade:</p>
     </div>
+    <div class="mode-toggle" role="radiogroup" aria-label="Modo de jogo">
+      <button class="mode-btn active" data-mode="1" role="radio" aria-checked="true">1 jogador</button>
+      <button class="mode-btn" data-mode="2" role="radio" aria-checked="false">2 jogadores</button>
+    </div>
     <div class="levels" id="levels"></div>
   </div>
 </section>
@@ -358,6 +378,7 @@
     <div class="game-info">
       <span class="chip" id="chip-theme"></span>
       <span class="chip" id="chip-moves"></span>
+      <span id="duo-chips" style="display: contents;"></span>
     </div>
     <div class="grid" id="grid"></div>
   </div>
@@ -400,6 +421,24 @@
     <div class="login-actions">
       <button class="btn ghost" id="login-close">Fechar</button>
       <button class="btn ghost" id="login-logout" hidden>Sair da conta</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======== OVERLAY: NOMES (2 JOGADORES) ======== -->
+<div class="overlay" id="names-overlay">
+  <div class="win-card" id="names-card" role="dialog" aria-modal="true" aria-labelledby="names-title">
+    <h2 id="names-title">Quem vai jogar?</h2>
+    <p id="names-sub">Cada criança joga na sua vez!</p>
+    <form class="login-form" id="names-form">
+      <label for="player1-name">Jogador 1</label>
+      <input class="login-input" type="text" id="player1-name" maxlength="14" required>
+      <label for="player2-name">Jogador 2</label>
+      <input class="login-input" type="text" id="player2-name" maxlength="14" required>
+      <button class="btn" type="submit">Começar a jogar!</button>
+    </form>
+    <div class="login-actions">
+      <button class="btn ghost" id="names-close">Voltar</button>
     </div>
   </div>
 </div>
@@ -500,7 +539,12 @@
     matches: 0,
     mistakes: 0,
     muted: false,
-    round: 0
+    round: 0,
+    mode: 1,
+    players: null,
+    turn: 0,
+    user: null,
+    progressMap: {}
   };
 
   var $ = function (sel) { return document.querySelector(sel); };
@@ -622,7 +666,9 @@
       btn.className = "theme-card";
       btn.style.setProperty("--tint", t.tint);
       btn.setAttribute("aria-label", "Tema " + t.name);
-      btn.innerHTML = '<span class="bubble" aria-hidden="true">' + t.preview + '</span><span class="tname">' + t.name + "</span>";
+      btn.innerHTML =
+        '<span class="bubble" aria-hidden="true">' + t.preview + '</span><span class="tname">' + t.name + "</span>";
+      btn.dataset.themeId = t.id;
       btn.addEventListener("click", function () {
         sfx.click();
         state.theme = t;
@@ -649,7 +695,16 @@
       btn.addEventListener("click", function () {
         sfx.click();
         state.level = lv;
-        startGame();
+        if (state.mode === 2) {
+          if (state.players) {
+            $("#player1-name").value = state.players[0].name;
+            $("#player2-name").value = state.players[1].name;
+          }
+          $("#names-overlay").classList.add("show");
+          $("#player1-name").focus();
+        } else {
+          startGame();
+        }
       });
       wrap.appendChild(btn);
     });
@@ -680,6 +735,13 @@
     state.moves = 0;
     state.matches = 0;
     state.mistakes = 0;
+    state.turn = 0;
+    if (state.mode === 2 && state.players) {
+      state.players[0].pairs = 0;
+      state.players[1].pairs = 0;
+    }
+    $("#chip-moves").hidden = state.mode === 2;
+    if (state.mode === 2) renderDuoChips();
 
     var grid = $("#grid");
     grid.className = "grid grid-" + state.level.id;
@@ -716,6 +778,17 @@
     if (el) el.textContent = msg;
   }
 
+  function renderDuoChips() {
+    var box = $("#duo-chips");
+    box.innerHTML = "";
+    [0, 1].forEach(function (i) {
+      var s = document.createElement("span");
+      s.className = "chip player-chip" + (state.turn === i ? " active" : "");
+      s.textContent = state.players[i].name + ": " + state.players[i].pairs + " pares";
+      box.appendChild(s);
+    });
+  }
+
   function onCardClick(card, item) {
     if (state.lock) return;
     if (card.classList.contains("flipped") || card.classList.contains("matched")) return;
@@ -745,6 +818,10 @@
       sfx.match();
       speak(item.w);
       setStatus("Par de " + item.w + " encontrado!");
+      if (state.mode === 2) {
+        state.players[state.turn].pairs++;
+        renderDuoChips();
+      }
       if (state.matches === state.level.pairs) {
         var roundAtWin = state.round;
         setTimeout(function () {
@@ -770,6 +847,11 @@
           firstCopy.card.setAttribute("aria-label", "Carta virada");
           card.setAttribute("aria-label", "Carta virada");
           state.lock = false;
+          if (state.mode === 2) {
+            state.turn = 1 - state.turn;
+            renderDuoChips();
+            setStatus("Vez de " + state.players[state.turn].name + "!");
+          }
         }, MISMATCH_REFLIP_DELAY);
       }, MISMATCH_SHOW_DELAY);
     }
@@ -777,29 +859,81 @@
 
   /* ================= Vitória ================= */
 
+  function saveProgress(stars) {
+    if (!state.user) return;
+    postJSON("/api/progress", { theme: state.theme.id, level: state.level.id, stars: stars }).then(function (r) {
+      if (r.ok) loadProgress();
+    }).catch(function () { /* sem conexão: progresso não salva */ });
+  }
+
+  function loadProgress() {
+    if (!state.user) {
+      state.progressMap = {};
+      renderThemeStars();
+      return;
+    }
+    fetch("/api/progress").then(function (r) { return r.json(); }).then(function (d) {
+      var map = {};
+      (d.progress || []).forEach(function (row) {
+        map[row.theme] = (map[row.theme] || 0) + row.stars;
+      });
+      state.progressMap = map;
+      renderThemeStars();
+    }).catch(function () { /* offline */ });
+  }
+
+  function renderThemeStars() {
+    document.querySelectorAll(".theme-card").forEach(function (card) {
+      var old = card.querySelector(".theme-stars");
+      if (old) old.remove();
+      var total = state.progressMap[card.dataset.themeId];
+      if (state.user && total > 0) {
+        var s = document.createElement("span");
+        s.className = "theme-stars";
+        s.setAttribute("aria-label", total + " de 9 estrelas neste tema");
+        s.textContent = "\u2605 " + total + "/9";
+        card.appendChild(s);
+      }
+    });
+  }
+
   function win() {
     sfx.win();
     confetti();
 
-    var stars = 1;
-    if (state.mistakes <= state.level.pairs) stars = 3;
-    else if (state.mistakes <= state.level.pairs * 2) stars = 2;
-
-    var msgs = ["Você encontrou todos os pares!", "Que memória incrível!", "Você é demais!", "Muito bem, campeão!"];
-    $("#win-title").textContent = ["Parabéns!", "Muito bem!", "Incrível!", "Você conseguiu!"][Math.floor(Math.random() * 4)];
-    $("#win-msg").textContent = msgs[Math.floor(Math.random() * msgs.length)];
-    $("#win-msg").textContent += " Você fez " + state.moves + " jogadas.";
-
     var wrap = $("#win-stars");
-    wrap.innerHTML = STAR_SVG + STAR_SVG + STAR_SVG;
-    wrap.querySelectorAll("svg").forEach(function (svg, i) {
-      if (i < stars) svg.classList.add("lit");
-    });
+    var title, msg;
+
+    if (state.mode === 2) {
+      var p1 = state.players[0], p2 = state.players[1];
+      wrap.style.display = "none";
+      title = p1.pairs === p2.pairs ? "Empate!" : (p1.pairs > p2.pairs ? p1.name + " venceu!" : p2.name + " venceu!");
+      msg = p1.name + ": " + p1.pairs + " pares \u2022 " + p2.name + ": " + p2.pairs + " pares.";
+    } else {
+      var stars = 1;
+      if (state.mistakes <= state.level.pairs) stars = 3;
+      else if (state.mistakes <= state.level.pairs * 2) stars = 2;
+
+      var msgs = ["Você encontrou todos os pares!", "Que memória incrível!", "Você é demais!", "Muito bem, campeão!"];
+      title = ["Parabéns!", "Muito bem!", "Incrível!", "Você conseguiu!"][Math.floor(Math.random() * 4)];
+      msg = msgs[Math.floor(Math.random() * msgs.length)];
+      msg += " Você fez " + state.moves + " jogadas.";
+
+      wrap.style.display = "";
+      wrap.innerHTML = STAR_SVG + STAR_SVG + STAR_SVG;
+      wrap.querySelectorAll("svg").forEach(function (svg, i) {
+        if (i < stars) svg.classList.add("lit");
+      });
+      saveProgress(stars);
+    }
+
+    $("#win-title").textContent = title;
+    $("#win-msg").textContent = msg;
 
     $("#win-overlay").classList.add("show");
-    setStatus($("#win-title").textContent + " " + $("#win-msg").textContent);
+    setStatus(title + " " + msg);
     $("#play-again").focus();
-    if (!state.muted) speak($("#win-title").textContent);
+    if (!state.muted) speak(title);
   }
 
   function closeOverlay() {
@@ -845,6 +979,7 @@
       var status = $("#login-status");
       status.textContent = "Conectado como " + email;
       status.classList.add("ok");
+      loadProgress();
     }
   }
 
@@ -913,6 +1048,31 @@
       }
     });
 
+    document.querySelectorAll(".mode-btn").forEach(function (b) {
+      b.addEventListener("click", function () {
+        sfx.click();
+        state.mode = Number(b.dataset.mode);
+        document.querySelectorAll(".mode-btn").forEach(function (x) {
+          var active = x === b;
+          x.classList.toggle("active", active);
+          x.setAttribute("aria-checked", String(active));
+        });
+      });
+    });
+
+    $("#names-form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var n1 = $("#player1-name").value.trim() || "Jogador 1";
+      var n2 = $("#player2-name").value.trim() || "Jogador 2";
+      state.players = [{ name: n1, pairs: 0 }, { name: n2, pairs: 0 }];
+      $("#names-overlay").classList.remove("show");
+      sfx.click();
+      startGame();
+    });
+    $("#names-close").addEventListener("click", function () {
+      $("#names-overlay").classList.remove("show");
+    });
+
     $("#login-btn").innerHTML = USER_SVG;
     $("#login-btn").addEventListener("click", function () { sfx.click(); openLogin(); });
     $("#login-close").addEventListener("click", function () { sfx.click(); closeLogin(); });
@@ -978,11 +1138,13 @@
         var status = $("#login-status");
         status.textContent = "Você saiu da conta.";
         status.classList.remove("ok");
+        state.user = null;
+        loadProgress();
       });
     });
 
     fetch("/api/me").then(function (r) { return r.json(); }).then(function (d) {
-      if (d.email) setLoginState(d.email);
+      if (d.email) { setLoginState(d.email); loadProgress(); }
     }).catch(function () { /* offline: segue sem login */ });
 
     renderThemes();
