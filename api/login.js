@@ -1,4 +1,4 @@
-const { sign, isValidEmail, safeEqual } = require("./_lib");
+const { sign, isValidEmail } = require("./_lib");
 
 module.exports = async (req, res) => {
   if (req.method !== "POST") {
@@ -12,7 +12,7 @@ module.exports = async (req, res) => {
 
   const code = String(Math.floor(100000 + Math.random() * 900000));
   const exp = Date.now() + 10 * 60 * 1000;
-  const payload = `${email}.${code}.${exp}`;
+  const payload = `${email}|${code}|${exp}`;
   const sig = sign(payload);
   const token = Buffer.from(`${payload}.${sig}`, "utf8").toString("base64url");
 

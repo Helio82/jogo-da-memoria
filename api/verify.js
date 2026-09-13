@@ -20,13 +20,13 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: "Token inválido. Peça um código novo." });
   }
 
-  const parts = decoded.split(".");
+  const parts = decoded.split("|");
   if (parts.length !== 4) {
     return res.status(400).json({ error: "Token inválido. Peça um código novo." });
   }
   const [em, cd, exp, sig] = parts;
 
-  if (!safeEqual(sig, sign(`${em}.${cd}.${exp}`))) {
+  if (!safeEqual(sig, sign(`${em}|${cd}|${exp}`))) {
     return res.status(400).json({ error: "Token inválido. Peça um código novo." });
   }
 
@@ -53,7 +53,7 @@ module.exports = async (req, res) => {
   attempts.delete(limiterKey);
 
   const sessExp = Date.now() + 7 * 24 * 60 * 60 * 1000;
-  const sessPayload = `${em}.${sessExp}`;
+  const sessPayload = `${em}|${sessExp}`;
   const sessSig = sign(sessPayload);
   const sess = Buffer.from(`${sessPayload}.${sessSig}`, "utf8").toString("base64url");
 
