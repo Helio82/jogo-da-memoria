@@ -14,7 +14,7 @@ module.exports = async (req, res) => {
   const exp = Date.now() + 10 * 60 * 1000;
   const payload = `${email}|${code}|${exp}`;
   const sig = sign(payload);
-  const token = Buffer.from(`${payload}.${sig}`, "utf8").toString("base64url");
+  const token = Buffer.from(`${payload}|${sig}`, "utf8").toString("base64url");
 
   try {
     const resposta = await fetch("https://api.resend.com/emails", {
